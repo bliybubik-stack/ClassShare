@@ -6,7 +6,7 @@ const state = {
 };
 
 const OWNER_USERNAME = "WVOwner";
-const OWNER_PASSWORD = "WVOwnr-ABCDE-12345-FGHIJ-67890";
+const OWNER_PASSWORD = "WVOwnr-MEGAGEGA-6767-BRRBRRPAT-UTAKUSPAKUYTUALETIKI-PISYUNPIPIPOPO-PALABUBIKBLIY";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
