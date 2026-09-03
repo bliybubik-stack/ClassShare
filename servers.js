@@ -1,6 +1,6 @@
 const ClassDropServer = (() => {
     const BIN_ID = "6a996f27da38895dfe33dbb4";
-    const MASTER_KEY = "PASTE_NEW_MASTER_KEY_HERE";
+    const MASTER_KEY = "$2a$10$ZYWQQ5WXOTWoykEGqsDYjuJQGiKX/IGapxCxrAwrrIywe6veUaJB2";
     const API = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
     async function request(url, options = {}) {
