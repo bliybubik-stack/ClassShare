@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="description" content="ClassDrop school file sharing">
+  <title>ClassDrop</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.6/purify.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+  <div class="grain"></div>
+  <div id="toast-root"></div>
+
+  <section id="auth-view" class="auth-page">
+    <div class="auth-orbit orbit-one"></div>
+    <div class="auth-orbit orbit-two"></div>
+    <div class="auth-shell glass">
+      <div class="auth-brand">
+        <div class="brand-mark"><i data-lucide="layers-3"></i></div>
+        <div>
+          <div class="brand-name">ClassDrop</div>
+          <div class="brand-sub">One place for your class.</div>
+        </div>
+        <span class="live-dot"><span></span> online</span>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-auth="login">Log in</button>
+        <button class="auth-tab" data-auth="signup">Sign up</button>
+      </div>
+
+      <div class="auth-heading">
+        <div class="eyebrow">Welcome back</div>
+        <h1 id="auth-title">Log in to ClassDrop</h1>
+        <p id="auth-copy">Access class resources, posts and shared files.</p>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <label>Username<input id="login-username" autocomplete="username" placeholder="your.username" required></label>
+        <label>Password<input id="login-password" type="password" autocomplete="current-password" placeholder="Your password" required></label>
+        <button class="primary-btn w-full" type="submit"><span>Log in</span><i data-lucide="arrow-right"></i></button>
+      </form>
+
+      <form id="signup-form" class="auth-form hidden">
+        <label>Display name<input id="signup-name" maxlength="50" placeholder="Your name" required></label>
+        <label>Username<input id="signup-username" maxlength="30" autocomplete="username" placeholder="your.username" required></label>
+        <label>Password<input id="signup-password" type="password" minlength="8" autocomplete="new-password" placeholder="At least 8 characters" required></label>
+        <button class="primary-btn w-full" type="submit"><span>Create student account</span><i data-lucide="user-plus"></i></button>
+      </form>
+
+      <div class="auth-note"><i data-lucide="shield-check"></i><span>Student accounts are created instantly. Teacher and owner access is controlled by ClassDrop administration.</span></div>
+    </div>
+  </section>
+
+  <div id="app-view" class="hidden app-layout">
+    <div id="sidebar-backdrop"></div>
+    <aside id="sidebar" class="sidebar glass">
+      <div class="sidebar-top">
+        <div class="brand-mark small"><i data-lucide="layers-3"></i></div>
+        <div class="brand-name">ClassDrop</div>
+        <button id="close-menu" class="icon-btn mobile-only"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="sidebar-label">Spaces</div>
+      <nav id="nav">
+        <button class="nav-item active" data-section="General"><i data-lucide="globe-2"></i><span>General</span><b></b></button>
+        <button class="nav-item" data-section="My Class"><i data-lucide="school"></i><span>My Class</span><b></b></button>
+        <button class="nav-item" data-section="Off Topic"><i data-lucide="message-circle"></i><span>Off Topic</span><b></b></button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div id="teacher-tools" class="hidden">
+          <button id="new-post-btn" class="nav-item accent"><i data-lucide="square-pen"></i><span>New post</span></button>
+        </div>
+        <div id="owner-tools" class="hidden">
+          <button id="owner-panel-btn" class="nav-item"><i data-lucide="shield"></i><span>Owner panel</span></button>
+        </div>
+        <button id="logout-btn" class="nav-item"><i data-lucide="log-out"></i><span>Log out</span></button>
+      </div>
+    </aside>
+
+    <div id="page">
+      <header class="topbar glass-bar">
+        <div class="topbar-left">
+          <button id="open-menu" class="icon-btn mobile-only"><i data-lucide="menu"></i></button>
+          <div>
+            <div id="section-kicker" class="eyebrow">Space</div>
+            <h1 id="section-title">General</h1>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button id="refresh-btn" class="icon-btn" title="Refresh"><i data-lucide="refresh-cw"></i></button>
+          <button id="profile-btn" class="profile-chip">
+            <span id="profile-avatar">U</span>
+            <span class="profile-copy"><strong id="profile-name">User</strong><small id="profile-role">Student</small></span>
+            <i data-lucide="chevron-down"></i>
+          </button>
+        </div>
+      </header>
+
+      <main id="content">
+        <section id="feed-view">
+          <div class="hero glass">
+            <div>
+              <div class="eyebrow">ClassDrop feed</div>
+              <h2 id="feed-title">General</h2>
+              <p>Shared resources, announcements and useful files in one clean space.</p>
+            </div>
+            <div class="hero-orb"><i data-lucide="sparkles"></i></div>
+          </div>
+          <div class="feed-head">
+            <div><span class="section-status"><span></span> Live feed</span></div>
+            <div id="feed-count" class="count-pill">0 posts</div>
+          </div>
+          <div id="posts" class="posts"></div>
+          <div id="empty-state" class="empty-state glass">
+            <div class="empty-icon"><i data-lucide="inbox"></i></div>
+            <strong>No posts yet</strong>
+            <span>When something is shared here, it will appear in this space.</span>
+          </div>
+        </section>
+
+        <section id="owner-view" class="hidden">
+          <div class="hero glass">
+            <div><div class="eyebrow">Administration</div><h2>Owner panel</h2><p>Manage roles, moderation and class accounts.</p></div>
+            <div class="hero-orb"><i data-lucide="shield-check"></i></div>
+          </div>
+          <div id="accounts" class="accounts"></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div id="post-modal" class="modal hidden">
+    <div class="modal-card glass">
+      <div class="modal-head"><div><div class="eyebrow">Teacher tools</div><h2>Create post</h2></div><button class="icon-btn close-modal"><i data-lucide="x"></i></button></div>
+      <form id="post-form">
+        <div class="form-grid">
+          <label>Title <span>optional</span><input id="post-title" maxlength="120" placeholder="Homework, announcement..." autocomplete="off"></label>
+          <label>Subtitle <span>optional</span><input id="post-subtitle" maxlength="160" placeholder="A short line" autocomplete="off"></label>
+        </div>
+        <label>Description <span>optional</span><textarea id="post-description" maxlength="4000" rows="5" placeholder="Add some context..."></textarea></label>
+        <div class="form-grid">
+          <label>Section<select id="post-section"><option>General</option><option>My Class</option><option>Off Topic</option></select></label>
+          <label>Files <span>up to 5</span><input id="post-files" type="file" multiple></label>
+        </div>
+        <div id="file-preview" class="file-preview"></div>
+        <div class="check-row">
+          <label class="check"><input id="post-pin" type="checkbox"><span>Pin</span></label>
+          <label class="check"><input id="post-highlight" type="checkbox"><span>Highlight</span></label>
+          <label class="check"><input id="post-notify" type="checkbox"><span>Notify everyone</span></label>
+        </div>
+        <button class="primary-btn w-full" type="submit"><span>Publish post</span><i data-lucide="send"></i></button>
+      </form>
+    </div>
+  </div>
+
+  <div id="post-detail-modal" class="modal hidden">
+    <div class="modal-card glass detail-card">
+      <div class="modal-head"><div><div class="eyebrow">Post</div><h2 id="detail-title">Post</h2></div><button class="icon-btn close-modal"><i data-lucide="x"></i></button></div>
+      <div id="post-detail"></div>
+    </div>
+  </div>
+
+  <div id="profile-modal" class="modal hidden">
+    <div class="modal-card glass small-modal">
+      <div class="modal-head"><div><div class="eyebrow">Account</div><h2 id="profile-modal-name">User</h2></div><button class="icon-btn close-modal"><i data-lucide="x"></i></button></div>
+      <div id="profile-modal-body"></div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
