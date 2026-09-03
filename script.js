@@ -1,40 +1,1088 @@
-const state = {user:null,section:"General",posts:[],users:[]};
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const icon=name=>`<i data-lucide="${name}"></i>`;
-function renderIcons(){window.lucide?.createIcons()}
-function escapeHtml(value=""){return DOMPurify.sanitize(String(value),{ALLOWED_TAGS:[],ALLOWED_ATTR:[]})}
-function formatSize(bytes){if(!Number.isFinite(bytes))return"Unknown size";if(bytes<1024)return`${bytes} B`;if(bytes<1048576)return`${(bytes/1024).toFixed(1)} KB`;if(bytes<1073741824)return`${(bytes/1048576).toFixed(1)} MB`;return`${(bytes/1073741824).toFixed(1)} GB`}
-function fileIcon(name=""){const e=name.split(".").pop().toLowerCase();if(["png","jpg","jpeg","gif","webp","svg","bmp","ico"].includes(e))return"image";if(["mp4","webm","mov","avi","mkv"].includes(e))return"video";if(["mp3","wav","ogg","flac","m4a"].includes(e))return"music";if(["zip","rar","7z","tar","gz","bz2"].includes(e))return"archive";if(["pdf","doc","docx","odt","rtf"].includes(e))return"file-text";if(["xls","xlsx","csv","ods"].includes(e))return"table-2";if(["ppt","pptx","odp"].includes(e))return"presentation";if(["js","ts","html","css","json","py","lua","java","cpp","c","cs","rb","php","xml","yaml","yml"].includes(e))return"code-2";return"file"}
-function showToast(message){const toast=document.createElement("div");toast.className="toast";toast.textContent=message;$("#toast-root").appendChild(toast);gsap.fromTo(toast,{y:18,opacity:0,scale:.98},{y:0,opacity:1,scale:1,duration:.28,ease:"power2.out"});setTimeout(()=>gsap.to(toast,{y:10,opacity:0,duration:.22,onComplete:()=>toast.remove()}),3000)}
-async function api(url,options={}){let response;try{const token=localStorage.getItem("classdrop_token");response=await fetch(url,{...options,headers:{"Content-Type":"application/json",...(token?{Authorization:`Bearer ${token}`}:{}) ,...(options.headers||{})}})}catch{throw new Error("Cannot reach the ClassDrop server. Make sure servers.js is running and the site is using the correct server URL.")}
-let data={};const raw=await response.text();try{data=raw?JSON.parse(raw):{}}catch{data={error:raw||`Server returned ${response.status}`}}
-if(!response.ok)throw new Error(data.error||`Request failed with ${response.status}`);return data}
-function setAuthMode(mode){$$('.auth-tab').forEach(t=>t.classList.toggle('active',t.dataset.auth===mode));$("#login-form").classList.toggle("hidden",mode!=="login");$("#signup-form").classList.toggle("hidden",mode!=="signup");$("#auth-title").textContent=mode==="login"?"Log in to ClassDrop":"Create your student account";$("#auth-copy").textContent=mode==="login"?"Access class resources, posts and shared files.":"Join your class space and start receiving shared resources.";gsap.fromTo(".auth-heading",{y:8,opacity:.3},{y:0,opacity:1,duration:.25})}
-function showApp(){$("#auth-view").classList.add("hidden");$("#app-view").classList.remove("hidden");updateProfile();renderIcons();gsap.fromTo("#app-view",{opacity:0},{opacity:1,duration:.45});loadSection(state.section)}
-function updateProfile(){if(!state.user)return;$("#profile-name").textContent=state.user.displayName;$("#profile-role").textContent=state.user.role;$("#profile-avatar").textContent=state.user.displayName.slice(0,1).toUpperCase();$("#teacher-tools").classList.toggle("hidden",!['teacher','owner'].includes(state.user.role));$("#owner-tools").classList.toggle("hidden",state.user.role!=="owner")}
-function updateNav(section){$$('.nav-item[data-section]').forEach(item=>item.classList.toggle('active',item.dataset.section===section));$("#section-title").textContent=section;$("#feed-title").textContent=section}
-async function login(username,password){const button=$("#login-form button");button.disabled=true;try{const data=await api("/api/login",{method:"POST",body:JSON.stringify({username,password})});state.user=data.user;localStorage.setItem("classdrop_token",data.token);localStorage.setItem("classdrop_session",JSON.stringify(data.user));showApp();showToast(`Welcome back, ${data.user.displayName}.`)}finally{button.disabled=false}}
-async function signup(displayName,username,password){const button=$("#signup-form button");button.disabled=true;try{const data=await api("/api/signup",{method:"POST",body:JSON.stringify({displayName,username,password})});state.user=data.user;localStorage.setItem("classdrop_token",data.token);localStorage.setItem("classdrop_session",JSON.stringify(data.user));showApp();showToast("Your account is ready.")}finally{button.disabled=false}}
-async function restoreSession(){const token=localStorage.getItem("classdrop_token");if(!token)return;try{const data=await api("/api/session",{method:"POST",body:"{}"});state.user=data.user;localStorage.setItem("classdrop_session",JSON.stringify(data.user));showApp()}catch{localStorage.removeItem("classdrop_token");localStorage.removeItem("classdrop_session")}}
-async function loadSection(section){if(!state.user)return;state.section=section;updateNav(section);$("#owner-view").classList.add("hidden");$("#feed-view").classList.remove("hidden");const posts=$("#posts");gsap.to(posts,{opacity:.35,duration:.12});try{const data=await api(`/api/posts?section=${encodeURIComponent(section)}`);state.posts=data.posts;renderPosts()}catch(error){showToast(error.message)}finally{gsap.to(posts,{opacity:1,duration:.22})}}
-function renderPosts(){const posts=$("#posts");$("#feed-count").textContent=`${state.posts.length} ${state.posts.length===1?'post':'posts'}`;$("#empty-state").classList.toggle("hidden",state.posts.length>0);posts.innerHTML=state.posts.map((post,index)=>{const description=post.description||"No description.";const short=description.length>30?`${description.slice(0,30)}...`:description;const files=(post.files||[]).map(file=>`<div class="file-card"><div class="file-icon">${icon(fileIcon(file.name))}</div><div class="file-info"><div class="file-name">${escapeHtml(file.name)}</div><div class="file-meta">${formatSize(file.size)} · ${escapeHtml(file.extension||'file')}</div></div></div>`).join("");return`<article class="post ${post.highlighted?'highlighted':''} ${post.pinned?'pinned':''}" data-post-card="${post.id}"><div class="post-top"><div><div class="post-title">${escapeHtml(post.title||'Untitled post')}</div>${post.subtitle?`<div class="post-subtitle">${escapeHtml(post.subtitle)}</div>`:''}</div><div class="post-badges">${post.pinned?`<span class="badge">${icon('pin')} Pinned</span>`:''}${post.highlighted?`<span class="badge">${icon('sparkles')} Highlight</span>`:''}</div></div><div class="post-description">${escapeHtml(short)}${description.length>30?` <span class="more">Read more</span>`:''}</div>${files?`<div class="post-files">${files}</div>`:''}<div class="post-meta"><span>${escapeHtml(post.authorName)}</span><span class="dot"></span><span>${new Date(post.createdAt).toLocaleString()}</span></div><div class="post-actions"><div class="action-group"><button class="small-btn ${post.liked?'liked':''}" data-like="${post.id}">${icon('heart')} ${post.likes||0}</button><button class="small-btn" data-open="${post.id}">${icon('message-circle')} ${post.commentCount||0}</button></div><button class="small-btn" data-open="${post.id}">Read more ${icon('arrow-up-right')}</button></div></article>`}).join("");renderIcons();if(state.posts.length)gsap.from(".post",{y:15,opacity:0,duration:.38,stagger:.055,ease:"power2.out"})}
-async function toggleLike(postId){try{const data=await api(`/api/posts/${postId}/like`,{method:"POST",body:"{}"});const post=state.posts.find(p=>p.id===postId);if(post){post.likes=data.likes;post.liked=data.liked}renderPosts()}catch(error){showToast(error.message)}}
-async function openPost(postId){try{const {post}=await api(`/api/posts/${postId}`);$("#detail-title").textContent=post.title||"Untitled post";const comments=(post.comments||[]).map(c=>`<div class="comment"><div class="comment-author">${escapeHtml(c.authorName)}</div><div class="comment-text">${escapeHtml(c.text)}</div></div>`).join("");const files=(post.files||[]).map(file=>`<div class="file-row file-card"><div class="file-icon">${icon(fileIcon(file.name))}</div><div class="file-info"><div class="file-name">${escapeHtml(file.name)}</div><div class="file-meta">${formatSize(file.size)} · ${escapeHtml(file.extension||'file')}</div></div><button class="file-download" data-download="${escapeHtml(file.id)}">${icon('download')}</button></div>`).join("");$("#post-detail").innerHTML=`<div class="post-meta"><span>${escapeHtml(post.authorName)}</span><span class="dot"></span><span>${escapeHtml(post.section)}</span><span class="dot"></span><span>${new Date(post.createdAt).toLocaleString()}</span></div>${post.subtitle?`<div class="post-subtitle" style="margin:12px 0">${escapeHtml(post.subtitle)}</div>`:''}<div class="detail-body">${escapeHtml(post.description||'No description.')}</div><div class="detail-files">${files||'<div class="comment-text">No files attached.</div>'}</div><div class="comments"><h3>Comments</h3>${comments||'<div class="comment-text">No comments yet.</div>'}<form class="comment-form" id="comment-form"><input id="comment-input" maxlength="500" placeholder="Write a comment..." required><button class="primary-btn" type="submit">${icon('send')}</button></form></div>`;$("#post-detail-modal").classList.remove("hidden");$("#post-detail-modal").dataset.post=post.id;renderIcons();gsap.fromTo("#post-detail-modal .modal-card",{y:25,opacity:0,scale:.97},{y:0,opacity:1,scale:1,duration:.3,ease:"power2.out"})}catch(error){showToast(error.message)}}
-async function submitComment(postId,text){try{await api(`/api/posts/${postId}/comments`,{method:"POST",body:JSON.stringify({text})});await openPost(postId);await loadSection(state.section)}catch(error){showToast(error.message)}}
-function readFile(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve({name:file.name,type:file.type||'application/octet-stream',size:file.size,data:reader.result});reader.onerror=()=>reject(new Error(`Could not read ${file.name}`));reader.readAsDataURL(file)})}
-async function createPost(){const files=[...$("#post-files").files];if(files.length>5){showToast("You can upload up to 5 files.");return}const button=$("#post-form button[type=submit]");button.disabled=true;try{const encodedFiles=[];for(const file of files)encodedFiles.push(await readFile(file));const payload={title:$("#post-title").value.trim(),subtitle:$("#post-subtitle").value.trim(),description:$("#post-description").value.trim(),section:$("#post-section").value,pinned:$("#post-pin").checked,highlighted:$("#post-highlight").checked,notify:$("#post-notify").checked,files:encodedFiles};await api("/api/posts",{method:"POST",body:JSON.stringify(payload)});$("#post-form").reset();$("#file-preview").innerHTML="";closeModals();state.section=payload.section;await loadSection(state.section);showToast("Post published.")}catch(error){showToast(error.message)}finally{button.disabled=false}}
-async function downloadFile(fileId){window.open(`/api/files/${encodeURIComponent(fileId)}`,"_blank","noopener")}
-async function loadOwnerPanel(){if(state.user.role!=="owner")return;try{const data=await api("/api/admin/users");state.users=data.users;$("#feed-view").classList.add("hidden");$("#owner-view").classList.remove("hidden");$("#section-title").textContent="Owner panel";$("#section-kicker").textContent="Administration";$("#accounts").innerHTML=state.users.map(user=>`<div class="account"><div><div class="account-name">${escapeHtml(user.displayName)} · @${escapeHtml(user.username)}</div><div class="account-info">${escapeHtml(user.role)} · ${escapeHtml(user.status)} · ${new Date(user.createdAt).toLocaleDateString()}</div></div><div class="account-actions">${user.username==='WVOwner'?'<span class="count-pill">Owner</span>':`<select data-role="${user.id}"><option value="student" ${user.role==='student'?'selected':''}>Student</option><option value="teacher" ${user.role==='teacher'?'selected':''}>Teacher</option></select><button class="neutral-btn" data-mute="${user.id}">${user.status==='muted'?'Unmute':'Mute'}</button><button class="danger-btn" data-ban="${user.id}">${user.status==='banned'?'Unban':'Ban'}</button>`}</div></div>`).join("");renderIcons();gsap.from(".account",{y:10,opacity:0,duration:.3,stagger:.04})}catch(error){showToast(error.message)}}
-async function changeRole(userId,role){try{await api(`/api/admin/users/${userId}/role`,{method:"POST",body:JSON.stringify({role})});showToast("Role updated.");loadOwnerPanel()}catch(error){showToast(error.message)}}
-async function changeStatus(userId,action){try{await api(`/api/admin/users/${userId}/status`,{method:"POST",body:JSON.stringify({action})});showToast("Account updated.");loadOwnerPanel()}catch(error){showToast(error.message)}}
-function openProfile(){$("#profile-modal-name").textContent=state.user.displayName;$("#profile-modal-body").innerHTML=`<div class="profile-details"><div class="profile-detail"><span>Username</span><span>@${escapeHtml(state.user.username)}</span></div><div class="profile-detail"><span>Role</span><span>${escapeHtml(state.user.role)}</span></div><div class="profile-detail"><span>Status</span><span>${escapeHtml(state.user.status)}</span></div></div>`;$("#profile-modal").classList.remove("hidden");renderIcons();gsap.fromTo("#profile-modal .modal-card",{y:20,opacity:0},{y:0,opacity:1,duration:.28})}
-function closeModals(){$$('.modal').forEach(modal=>{if(!modal.classList.contains('hidden'))gsap.to(modal,{opacity:0,duration:.15,onComplete:()=>{modal.classList.add('hidden');modal.style.opacity='' }})})}
-function logout(){localStorage.removeItem("classdrop_session");localStorage.removeItem("classdrop_token");location.reload()}
-$("#login-form").addEventListener("submit",async e=>{e.preventDefault();try{await login($("#login-username").value.trim(),$("#login-password").value)}catch(error){showToast(error.message)}});
-$("#signup-form").addEventListener("submit",async e=>{e.preventDefault();try{await signup($("#signup-name").value.trim(),$("#signup-username").value.trim(),$("#signup-password").value)}catch(error){showToast(error.message)}});
-$$('.auth-tab').forEach(tab=>tab.addEventListener('click',()=>setAuthMode(tab.dataset.auth)));
-$$('.nav-item[data-section]').forEach(item=>item.addEventListener('click',()=>{$("#sidebar").classList.remove('open');loadSection(item.dataset.section)}));
-$("#open-menu").addEventListener('click',()=>$("#sidebar").classList.add('open'));$("#close-menu").addEventListener('click',()=>$("#sidebar").classList.remove('open'));$("#sidebar-backdrop").addEventListener('click',()=>$("#sidebar").classList.remove('open'));$("#refresh-btn").addEventListener('click',()=>loadSection(state.section));$("#logout-btn").addEventListener('click',logout);$("#profile-btn").addEventListener('click',openProfile);$("#new-post-btn").addEventListener('click',()=>{$("#post-section").value=state.section;$("#post-modal").classList.remove('hidden');gsap.fromTo("#post-modal .modal-card",{y:25,opacity:0,scale:.97},{y:0,opacity:1,scale:1,duration:.3})});$("#owner-panel-btn").addEventListener('click',loadOwnerPanel);$$('.close-modal').forEach(b=>b.addEventListener('click',closeModals));
-document.addEventListener('click',e=>{const like=e.target.closest('[data-like]'),open=e.target.closest('[data-open]'),download=e.target.closest('[data-download]'),role=e.target.closest('[data-role]'),mute=e.target.closest('[data-mute]'),ban=e.target.closest('[data-ban]');if(like)toggleLike(like.dataset.like);if(open)openPost(open.dataset.open);if(download)downloadFile(download.dataset.download);if(role)changeRole(role.dataset.role,role.value);if(mute)changeStatus(mute.dataset.mute,'toggle-mute');if(ban)changeStatus(ban.dataset.ban,'toggle-ban')});
-$("#post-form").addEventListener('submit',e=>{e.preventDefault();createPost()});$("#post-files").addEventListener('change',()=>{const files=[...$("#post-files").files];$("#file-preview").innerHTML=files.slice(0,5).map(f=>`<div class="preview-item">${escapeHtml(f.name)} · ${formatSize(f.size)}</div>`).join('');if(files.length>5)showToast('Only the first 5 files will be accepted.')});$("#post-detail").addEventListener('submit',e=>{if(e.target.id!=='comment-form')return;e.preventDefault();submitComment($("#post-detail-modal").dataset.post,$("#comment-input").value.trim())});
-renderIcons();restoreSession();
+const state = {
+    database: null,
+    currentUser: null,
+    currentSection: "General",
+    selectedFiles: []
+};
+
+const OWNER_USERNAME = "WVOwner";
+const OWNER_PASSWORD = "WVOwnr-ABCDE-12345-FGHIJ-67890";
+
+const $ = selector => document.querySelector(selector);
+const $$ = selector => [...document.querySelectorAll(selector)];
+
+document.addEventListener("DOMContentLoaded", init);
+
+async function init() {
+    lucide.createIcons();
+
+    try {
+        state.database = await ClassDropServer.getDatabase();
+        await ensureOwner();
+        state.database = await ClassDropServer.getDatabase();
+
+        const savedUser = localStorage.getItem("classdrop_user");
+
+        if (savedUser) {
+            const user = state.database.users.find(item => item.id === savedUser);
+
+            if (user && user.status !== "banned") {
+                state.currentUser = user;
+                showApp();
+            } else {
+                localStorage.removeItem("classdrop_user");
+                showAuth();
+            }
+        } else {
+            showAuth();
+        }
+    } catch (error) {
+        console.error(error);
+        showAuth();
+        toast(error.message || "Could not connect to JSONBin.");
+    }
+
+    bindEvents();
+}
+
+async function ensureOwner() {
+    const existing = state.database.users.find(
+        user => user.username.toLowerCase() === OWNER_USERNAME.toLowerCase()
+    );
+
+    if (existing) {
+        return;
+    }
+
+    const owner = {
+        id: createId(),
+        username: OWNER_USERNAME,
+        displayName: "WVOwner",
+        password: await hashPassword(OWNER_PASSWORD),
+        role: "owner",
+        status: "active",
+        createdAt: new Date().toISOString()
+    };
+
+    state.database.users.push(owner);
+    await ClassDropServer.saveDatabase(state.database);
+}
+
+function bindEvents() {
+    $$(".auth-tab").forEach(button => {
+        button.addEventListener("click", () => {
+            $$(".auth-tab").forEach(item => item.classList.remove("active"));
+            button.classList.add("active");
+
+            const mode = button.dataset.auth;
+
+            $("#loginForm").classList.toggle("hidden", mode !== "login");
+            $("#signupForm").classList.toggle("hidden", mode !== "signup");
+
+            gsap.fromTo(
+                mode === "login" ? "#loginForm" : "#signupForm",
+                { opacity: 0, y: 8 },
+                { opacity: 1, y: 0, duration: .25 }
+            );
+        });
+    });
+
+    $("#loginForm").addEventListener("submit", login);
+    $("#signupForm").addEventListener("submit", signup);
+    $("#logoutButton").addEventListener("click", logout);
+    $("#refreshButton").addEventListener("click", refresh);
+    $("#notificationButton").addEventListener("click", toggleNotifications);
+    $("#clearNotifications").addEventListener("click", clearNotifications);
+    $("#createPostButton").addEventListener("click", () => openModal("#composerModal"));
+    $("#openAdmin").addEventListener("click", openAdmin);
+    $("#openMenu").addEventListener("click", () => $("#sidebar").classList.add("open"));
+    $("#closeMenu").addEventListener("click", () => $("#sidebar").classList.remove("open"));
+
+    $$(".nav-item[data-section]").forEach(button => {
+        button.addEventListener("click", () => {
+            state.currentSection = button.dataset.section;
+
+            $$(".nav-item[data-section]").forEach(item => item.classList.remove("active"));
+            button.classList.add("active");
+
+            $("#sectionTitle").textContent = state.currentSection;
+            $("#sidebar").classList.remove("open");
+
+            renderFeed();
+        });
+    });
+
+    $$(".close-modal").forEach(button => {
+        button.addEventListener("click", closeModals);
+    });
+
+    $$(".modal-backdrop").forEach(backdrop => {
+        backdrop.addEventListener("click", closeModals);
+    });
+
+    $("#postFiles").addEventListener("change", handleFiles);
+    $("#postForm").addEventListener("submit", createPost);
+
+    $("#feed").addEventListener("click", handleFeedClick);
+    $("#postModalContent").addEventListener("click", handlePostModalClick);
+    $("#accountsList").addEventListener("click", handleAccountClick);
+
+    window.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+            closeModals();
+            $("#notificationsPanel").classList.add("hidden");
+        }
+    });
+}
+
+async function login(event) {
+    event.preventDefault();
+
+    const username = $("#loginUsername").value.trim();
+    const password = $("#loginPassword").value;
+
+    if (!username || !password) {
+        toast("Enter your username and password.");
+        return;
+    }
+
+    try {
+        state.database = await ClassDropServer.getDatabase();
+
+        const user = state.database.users.find(
+            item => item.username.toLowerCase() === username.toLowerCase()
+        );
+
+        if (!user) {
+            toast("Account not found.");
+            return;
+        }
+
+        if (user.status === "banned") {
+            toast("This account is banned.");
+            return;
+        }
+
+        if (user.status === "muted") {
+            toast("You are muted. You can still log in.");
+        }
+
+        const passwordHash = await hashPassword(password);
+
+        if (passwordHash !== user.password) {
+            toast("Incorrect password.");
+            return;
+        }
+
+        state.currentUser = user;
+        localStorage.setItem("classdrop_user", user.id);
+
+        showApp();
+        toast(`Welcome back, ${user.displayName}.`);
+    } catch (error) {
+        toast(error.message);
+    }
+}
+
+async function signup(event) {
+    event.preventDefault();
+
+    const displayName = $("#signupDisplayName").value.trim();
+    const username = $("#signupUsername").value.trim();
+    const password = $("#signupPassword").value;
+
+    if (displayName.length < 2) {
+        toast("Enter a valid display name.");
+        return;
+    }
+
+    if (!/^[a-zA-Z0-9._-]{3,24}$/.test(username)) {
+        toast("Username must be 3–24 characters and use letters, numbers, ., _ or -.");
+        return;
+    }
+
+    if (password.length < 6) {
+        toast("Password must be at least 6 characters.");
+        return;
+    }
+
+    if (username.toLowerCase() === OWNER_USERNAME.toLowerCase()) {
+        toast("That username is reserved.");
+        return;
+    }
+
+    try {
+        state.database = await ClassDropServer.getDatabase();
+
+        const exists = state.database.users.some(
+            user => user.username.toLowerCase() === username.toLowerCase()
+        );
+
+        if (exists) {
+            toast("That username already exists.");
+            return;
+        }
+
+        const user = {
+            id: createId(),
+            username,
+            displayName,
+            password: await hashPassword(password),
+            role: "student",
+            status: "active",
+            createdAt: new Date().toISOString()
+        };
+
+        state.database.users.push(user);
+
+        await ClassDropServer.saveDatabase(state.database);
+
+        state.currentUser = user;
+        localStorage.setItem("classdrop_user", user.id);
+
+        showApp();
+        toast("Account created.");
+    } catch (error) {
+        toast(error.message);
+    }
+}
+
+function showAuth() {
+    $("#loadingScreen").classList.add("hidden");
+    $("#authScreen").classList.remove("hidden");
+    $("#app").classList.add("hidden");
+
+    gsap.fromTo(
+        "#authScreen .auth-shell",
+        { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: .5, ease: "power2.out" }
+    );
+}
+
+function showApp() {
+    $("#loadingScreen").classList.add("hidden");
+    $("#authScreen").classList.add("hidden");
+    $("#app").classList.remove("hidden");
+
+    updateAccountUI();
+    renderFeed();
+    updateNotifications();
+
+    gsap.fromTo(
+        "#app",
+        { opacity: 0 },
+        { opacity: 1, duration: .4 }
+    );
+}
+
+function updateAccountUI() {
+    if (!state.currentUser) {
+        return;
+    }
+
+    const user = state.currentUser;
+
+    $("#accountName").textContent = user.displayName;
+    $("#accountRole").textContent = roleLabel(user.role);
+    $("#accountAvatar").textContent = initials(user.displayName);
+    $("#welcomeText").textContent = `Welcome, ${user.displayName}.`;
+
+    const canPost = ["teacher", "owner"].includes(user.role);
+    const isOwner = user.role === "owner";
+
+    $("#createPostButton").classList.toggle("hidden", !canPost);
+    $("#ownerLink").classList.toggle("hidden", !isOwner);
+}
+
+function renderFeed() {
+    if (!state.database) {
+        return;
+    }
+
+    const posts = state.database.posts
+        .filter(post => post.section === state.currentSection)
+        .sort((a, b) => {
+            if (a.pinned !== b.pinned) {
+                return a.pinned ? -1 : 1;
+            }
+
+            return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+
+    $("#feed").innerHTML = "";
+    $("#emptyState").classList.toggle("hidden", posts.length > 0);
+
+    posts.forEach(post => {
+        $("#feed").appendChild(createPostCard(post));
+    });
+
+    lucide.createIcons();
+
+    gsap.fromTo(
+        ".post-card",
+        { opacity: 0, y: 12 },
+        {
+            opacity: 1,
+            y: 0,
+            duration: .35,
+            stagger: .04,
+            ease: "power2.out"
+        }
+    );
+}
+
+function createPostCard(post) {
+    const author = findUser(post.authorId);
+    const liked = post.likes?.includes(state.currentUser.id);
+
+    const card = document.createElement("article");
+    card.className = `post-card glass ${post.pinned ? "pinned" : ""} ${post.highlighted ? "highlighted" : ""}`;
+    card.dataset.id = post.id;
+
+    const description = post.description || "No description provided.";
+    const shortDescription = description.length > 30
+        ? `${description.slice(0, 30)}...`
+        : description;
+
+    card.innerHTML = `
+        <div class="post-meta">
+            <div class="author">
+                <div class="author-avatar">${escapeHTML(initials(author?.displayName || "U"))}</div>
+                <div>
+                    <div class="author-name">${escapeHTML(author?.displayName || "Unknown user")}</div>
+                    <div class="author-role">${escapeHTML(roleLabel(author?.role || "student"))}</div>
+                </div>
+            </div>
+
+            <div class="post-time">${timeAgo(post.createdAt)}</div>
+        </div>
+
+        ${post.title ? `<h3 class="post-title">${escapeHTML(post.title)}</h3>` : ""}
+        ${post.subtitle ? `<div class="post-subtitle">${escapeHTML(post.subtitle)}</div>` : ""}
+        <div class="post-description">${escapeHTML(shortDescription)}</div>
+
+        ${renderFiles(post.files || [])}
+
+        <div class="post-footer">
+            <div class="post-actions">
+                <button class="action-button ${liked ? "liked" : ""}" data-action="like" data-id="${post.id}">
+                    <i data-lucide="heart"></i>
+                    ${post.likes?.length || 0}
+                </button>
+
+                <button class="action-button" data-action="comments" data-id="${post.id}">
+                    <i data-lucide="message-circle"></i>
+                    ${state.database.comments.filter(comment => comment.postId === post.id).length}
+                </button>
+            </div>
+
+            <button class="read-more" data-action="open" data-id="${post.id}">
+                Read More
+                <i data-lucide="arrow-up-right"></i>
+            </button>
+        </div>
+    `;
+
+    return card;
+}
+
+function renderFiles(files) {
+    if (!files.length) {
+        return "";
+    }
+
+    return `
+        <div class="file-list">
+            ${files.map(file => `
+                <div class="file-row">
+                    <div class="file-icon">
+                        <i data-lucide="${fileIcon(file.name)}"></i>
+                    </div>
+
+                    <div class="file-info">
+                        <div class="file-name">${escapeHTML(file.name)}</div>
+                        <div class="file-meta">
+                            ${formatBytes(file.size)} · ${escapeHTML(file.format || "FILE")}
+                        </div>
+                    </div>
+
+                    <button class="download-button" data-download="${file.id}" data-post="${file.postId || ""}" title="Download">
+                        <i data-lucide="download"></i>
+                    </button>
+                </div>
+            `).join("")}
+        </div>
+    `;
+}
+
+async function handleFiles(event) {
+    const files = [...event.target.files];
+
+    if (files.length > 5) {
+        toast("You can upload a maximum of 5 files.");
+        event.target.value = "";
+        return;
+    }
+
+    state.selectedFiles = [];
+
+    for (const file of files) {
+        if (file.size > 45000) {
+            toast(`${file.name} is too large for the JSONBin test mode.`);
+            continue;
+        }
+
+        const data = await fileToDataURL(file);
+
+        state.selectedFiles.push({
+            id: createId(),
+            name: file.name,
+            size: file.size,
+            format: getExtension(file.name).toUpperCase() || "FILE",
+            type: file.type || "application/octet-stream",
+            data
+        });
+    }
+
+    renderSelectedFiles();
+}
+
+function renderSelectedFiles() {
+    $("#selectedFiles").innerHTML = state.selectedFiles.map(file => `
+        <div class="selected-file">
+            <span>${escapeHTML(file.name)}</span>
+            <span>${formatBytes(file.size)}</span>
+        </div>
+    `).join("");
+}
+
+async function createPost(event) {
+    event.preventDefault();
+
+    if (!["teacher", "owner"].includes(state.currentUser.role)) {
+        toast("Only teachers can post.");
+        return;
+    }
+
+    if (state.currentUser.status === "muted") {
+        toast("You are muted and cannot post.");
+        return;
+    }
+
+    if (state.selectedFiles.length > 5) {
+        toast("Maximum 5 files.");
+        return;
+    }
+
+    const post = {
+        id: createId(),
+        authorId: state.currentUser.id,
+        title: $("#postTitle").value.trim(),
+        subtitle: $("#postSubtitle").value.trim(),
+        description: $("#postDescription").value.trim(),
+        section: $("#postSection").value,
+        files: state.selectedFiles,
+        likes: [],
+        pinned: $("#postPinned").checked,
+        highlighted: $("#postHighlighted").checked,
+        createdAt: new Date().toISOString()
+    };
+
+    post.files = post.files.map(file => ({
+        ...file,
+        postId: post.id
+    }));
+
+    try {
+        state.database = await ClassDropServer.getDatabase();
+
+        state.database.posts.push(post);
+
+        if ($("#postNotify").checked) {
+            const recipients = state.database.users.filter(user => user.status !== "banned");
+
+            recipients.forEach(user => {
+                state.database.notifications.push({
+                    id: createId(),
+                    userId: user.id,
+                    postId: post.id,
+                    title: post.title || "New post",
+                    message: `${state.currentUser.displayName} posted in ${post.section}.`,
+                    createdAt: new Date().toISOString(),
+                    read: false
+                });
+            });
+        }
+
+        await ClassDropServer.saveDatabase(state.database);
+
+        closeModals();
+        resetComposer();
+        renderFeed();
+        updateNotifications();
+
+        toast("Post published.");
+    } catch (error) {
+        toast(error.message);
+    }
+}
+
+async function handleFeedClick(event) {
+    const download = event.target.closest("[data-download]");
+
+    if (download) {
+        const postId = download.dataset.post;
+        const post = state.database.posts.find(item => item.id === postId);
+        const file = post?.files.find(item => item.id === download.dataset.download);
+
+        if (file) {
+            downloadFile(file);
+        }
+
+        return;
+    }
+
+    const action = event.target.closest("[data-action]");
+
+    if (!action) {
+        return;
+    }
+
+    const id = action.dataset.id;
+
+    if (action.dataset.action === "like") {
+        await toggleLike(id);
+    }
+
+    if (action.dataset.action === "open") {
+        openPost(id);
+    }
+
+    if (action.dataset.action === "comments") {
+        openPost(id);
+    }
+}
+
+async function toggleLike(postId) {
+    const post = state.database.posts.find(item => item.id === postId);
+
+    if (!post) {
+        return;
+    }
+
+    post.likes ||= [];
+
+    const index = post.likes.indexOf(state.currentUser.id);
+
+    if (index >= 0) {
+        post.likes.splice(index, 1);
+    } else {
+        post.likes.push(state.currentUser.id);
+    }
+
+    try {
+        await ClassDropServer.saveDatabase(state.database);
+        renderFeed();
+    } catch (error) {
+        toast(error.message);
+    }
+}
+
+function openPost(postId) {
+    const post = state.database.posts.find(item => item.id === postId);
+
+    if (!post) {
+        return;
+    }
+
+    const author = findUser(post.authorId);
+    const comments = state.database.comments
+        .filter(comment => comment.postId === post.id)
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+    $("#postModalContent").innerHTML = `
+        <div class="modal-header">
+            <div>
+                <p class="eyebrow">${escapeHTML(post.section)}</p>
+                <h2>Post</h2>
+            </div>
+
+            <button class="icon-button close-modal">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+
+        <div class="post-meta">
+            <div class="author">
+                <div class="author-avatar">${escapeHTML(initials(author?.displayName || "U"))}</div>
+                <div>
+                    <div class="author-name">${escapeHTML(author?.displayName || "Unknown")}</div>
+                    <div class="author-role">${escapeHTML(roleLabel(author?.role || "student"))}</div>
+                </div>
+            </div>
+
+            <div class="post-time">${timeAgo(post.createdAt)}</div>
+        </div>
+
+        ${post.title ? `<h1 class="post-detail-title">${escapeHTML(post.title)}</h1>` : ""}
+        ${post.subtitle ? `<div class="post-subtitle">${escapeHTML(post.subtitle)}</div>` : ""}
+
+        <div class="post-detail-description">${escapeHTML(post.description || "No description provided.")}</div>
+
+        ${renderFiles(post.files || [])}
+
+        <div class="comments">
+            <h3>Comments</h3>
+
+            <div class="comment-list">
+                ${comments.length ? comments.map(renderComment).join("") : `
+                    <div class="comment">
+                        <div class="comment-text">No comments yet.</div>
+                    </div>
+                `}
+            </div>
+
+            <form class="comment-form" data-comment-post="${post.id}">
+                <input type="text" maxlength="500" placeholder="Write a comment..." required>
+                <button class="primary-button" type="submit">
+                    <i data-lucide="send"></i>
+                </button>
+            </form>
+        </div>
+    `;
+
+    openModal("#postModal");
+    lucide.createIcons();
+
+    $("#postModalContent").querySelector(".close-modal").addEventListener("click", closeModals);
+}
+
+function renderComment(comment) {
+    const user = findUser(comment.userId);
+
+    return `
+        <div class="comment">
+            <div class="comment-top">
+                <span class="comment-author">${escapeHTML(user?.displayName || "Unknown")}</span>
+                <span class="comment-date">${timeAgo(comment.createdAt)}</span>
+            </div>
+
+            <div class="comment-text">${DOMPurify.sanitize(comment.text)}</div>
+        </div>
+    `;
+}
+
+async function handlePostModalClick(event) {
+    const download = event.target.closest("[data-download]");
+
+    if (download) {
+        const post = state.database.posts.find(item => item.id === download.dataset.post);
+        const file = post?.files.find(item => item.id === download.dataset.download);
+
+        if (file) {
+            downloadFile(file);
+        }
+
+        return;
+    }
+
+    const form = event.target.closest("[data-comment-post]");
+
+    if (form) {
+        event.preventDefault();
+    }
+}
+
+document.addEventListener("submit", async event => {
+    const form = event.target.closest("[data-comment-post]");
+
+    if (!form) {
+        return;
+    }
+
+    event.preventDefault();
+
+    if (state.currentUser.status === "muted") {
+        toast("You are muted and cannot comment.");
+        return;
+    }
+
+    const input = form.querySelector("input");
+    const text = input.value.trim();
+
+    if (!text) {
+        return;
+    }
+
+    state.database.comments.push({
+        id: createId(),
+        postId: form.dataset.commentPost,
+        userId: state.currentUser.id,
+        text,
+        createdAt: new Date().toISOString()
+    });
+
+    try {
+        await ClassDropServer.saveDatabase(state.database);
+        openPost(form.dataset.commentPost);
+        renderFeed();
+    } catch (error) {
+        toast(error.message);
+    }
+});
+
+function openAdmin() {
+    if (state.currentUser.role !== "owner") {
+        return;
+    }
+
+    renderAdmin();
+    openModal("#adminModal");
+}
+
+function renderAdmin() {
+    const users = state.database.users;
+
+    $("#accountCount").textContent = users.length;
+    $("#postCount").textContent = state.database.posts.length;
+    $("#teacherCount").textContent = users.filter(user => user.role === "teacher").length;
+
+    $("#accountsList").innerHTML = users.map(user => `
+        <div class="account-row" data-user="${user.id}">
+            <div class="avatar">${escapeHTML(initials(user.displayName))}</div>
+
+            <div class="account-row-info">
+                <strong>${escapeHTML(user.displayName)}</strong>
+                <span>@${escapeHTML(user.username)} · ${escapeHTML(user.status)}</span>
+            </div>
+
+            <div class="account-controls">
+                <select data-role="${user.id}" ${user.role === "owner" ? "disabled" : ""}>
+                    <option value="student" ${user.role === "student" ? "selected" : ""}>Student</option>
+                    <option value="teacher" ${user.role === "teacher" ? "selected" : ""}>Teacher</option>
+                </select>
+
+                ${user.role !== "owner" ? `
+                    <button class="small-button" data-admin-action="save-role" data-id="${user.id}">Save</button>
+                    <button class="small-button" data-admin-action="mute" data-id="${user.id}">
+                        ${user.status === "muted" ? "Unmute" : "Mute"}
+                    </button>
+                    <button class="small-button" data-admin-action="ban" data-id="${user.id}">
+                        ${user.status === "banned" ? "Unban" : "Ban"}
+                    </button>
+                ` : ""}
+            </div>
+        </div>
+    `).join("");
+
+    lucide.createIcons();
+}
+
+async function handleAccountClick(event) {
+    const button = event.target.closest("[data-admin-action]");
+
+    if (!button) {
+        return;
+    }
+
+    const userId = button.dataset.id;
+    const user = state.database.users.find(item => item.id === userId);
+
+    if (!user || user.role === "owner") {
+        return;
+    }
+
+    const action = button.dataset.adminAction;
+
+    if (action === "save-role") {
+        const select = document.querySelector(`[data-role="${userId}"]`);
+        user.role = select.value;
+        toast(`${user.displayName} is now a ${roleLabel(user.role)}.`);
+    }
+
+    if (action === "mute") {
+        user.status = user.status === "muted" ? "active" : "muted";
+        toast(`${user.displayName} is ${user.status === "muted" ? "muted" : "unmuted"}.`);
+    }
+
+    if (action === "ban") {
+        user.status = user.status === "banned" ? "active" : "banned";
+        toast(`${user.displayName} is ${user.status === "banned" ? "banned" : "unbanned"}.`);
+    }
+
+    try {
+        await ClassDropServer.saveDatabase(state.database);
+        renderAdmin();
+    } catch (error) {
+        toast(error.message);
+    }
+}
+
+function updateNotifications() {
+    if (!state.currentUser || !state.database) {
+        return;
+    }
+
+    const notifications = state.database.notifications
+        .filter(item => item.userId === state.currentUser.id)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 30);
+
+    const unread = notifications.some(item => !item.read);
+
+    $("#notificationDot").classList.toggle("hidden", !unread);
+
+    $("#notificationsList").innerHTML = notifications.length
+        ? notifications.map(item => `
+            <div class="notification-item">
+                <strong>${escapeHTML(item.title)}</strong>
+                <p>${escapeHTML(item.message)}</p>
+                <time>${timeAgo(item.createdAt)}</time>
+            </div>
+        `).join("")
+        : `<div class="empty-state"><p>No notifications.</p></div>`;
+}
+
+async function toggleNotifications() {
+    const panel = $("#notificationsPanel");
+    panel.classList.toggle("hidden");
+
+    if (!panel.classList.contains("hidden")) {
+        state.database.notifications.forEach(notification => {
+            if (notification.userId === state.currentUser.id) {
+                notification.read = true;
+            }
+        });
+
+        try {
+            await ClassDropServer.saveDatabase(state.database);
+            updateNotifications();
+        } catch {
+        }
+    }
+}
+
+async function clearNotifications() {
+    state.database.notifications = state.database.notifications.filter(
+        notification => notification.userId !== state.currentUser.id
+    );
+
+    try {
+        await ClassDropServer.saveDatabase(state.database);
+        updateNotifications();
+        toast("Notifications cleared.");
+    } catch (error) {
+        toast(error.message);
+    }
+}
+
+async function refresh() {
+    try {
+        state.database = await ClassDropServer.getDatabase();
+
+        const user = state.database.users.find(item => item.id === state.currentUser.id);
+
+        if (!user || user.status === "banned") {
+            logout();
+            return;
+        }
+
+        state.currentUser = user;
+        updateAccountUI();
+        renderFeed();
+        updateNotifications();
+
+        toast("Updated.");
+    } catch (error) {
+        toast(error.message);
+    }
+}
+
+function logout() {
+    localStorage.removeItem("classdrop_user");
+    state.currentUser = null;
+    state.database = null;
+
+    closeModals();
+    $("#notificationsPanel").classList.add("hidden");
+
+    showAuth();
+}
+
+function openModal(selector) {
+    $(selector).classList.remove("hidden");
+
+    gsap.fromTo(
+        `${selector} .modal-card`,
+        { opacity: 0, y: 18, scale: .98 },
+        { opacity: 1, y: 0, scale: 1, duration: .25, ease: "power2.out" }
+    );
+}
+
+function closeModals() {
+    $$(".modal").forEach(modal => modal.classList.add("hidden"));
+}
+
+function resetComposer() {
+    $("#postForm").reset();
+    state.selectedFiles = [];
+    $("#selectedFiles").innerHTML = "";
+}
+
+function downloadFile(file) {
+    if (!file.data) {
+        toast("This file has no downloadable data.");
+        return;
+    }
+
+    const link = document.createElement("a");
+    link.href = file.data;
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+}
+
+function fileToDataURL(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+
+        reader.readAsDataURL(file);
+    });
+}
+
+async function hashPassword(value) {
+    const buffer = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(value)
+    );
+
+    return [...new Uint8Array(buffer)]
+        .map(byte => byte.toString(16).padStart(2, "0"))
+        .join("");
+}
+
+function createId() {
+    return `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+}
+
+function findUser(id) {
+    return state.database.users.find(user => user.id === id);
+}
+
+function roleLabel(role) {
+    return {
+        owner: "Owner",
+        teacher: "Teacher",
+        student: "Student"
+    }[role] || "Student";
+}
+
+function initials(value) {
+    return value
+        .split(/\s+/)
+        .map(part => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+}
+
+function formatBytes(bytes) {
+    if (!bytes) {
+        return "0 B";
+    }
+
+    const units = ["B", "KB", "MB", "GB"];
+    const index = Math.floor(Math.log(bytes) / Math.log(1024));
+
+    return `${(bytes / Math.pow(1024, index)).toFixed(index ? 1 : 0)} ${units[index]}`;
+}
+
+function getExtension(name) {
+    const parts = name.split(".");
+    return parts.length > 1 ? parts.pop() : "";
+}
+
+function fileIcon(name) {
+    const extension = getExtension(name).toLowerCase();
+
+    if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(extension)) {
+        return "image";
+    }
+
+    if (["mp4", "mov", "webm", "avi"].includes(extension)) {
+        return "video";
+    }
+
+    if (["mp3", "wav", "ogg", "flac"].includes(extension)) {
+        return "music";
+    }
+
+    if (["pdf"].includes(extension)) {
+        return "file-text";
+    }
+
+    if (["doc", "docx", "txt", "rtf"].includes(extension)) {
+        return "file-text";
+    }
+
+    if (["xls", "xlsx", "csv"].includes(extension)) {
+        return "table";
+    }
+
+    if (["ppt", "pptx"].includes(extension)) {
+        return "presentation";
+    }
+
+    if (["zip", "rar", "7z", "tar", "gz"].includes(extension)) {
+        return "archive";
+    }
+
+    if (["js", "html", "css", "json", "lua", "py"].includes(extension)) {
+        return "code";
+    }
+
+    return "file";
+}
+
+function timeAgo(date) {
+    try {
+        return dateFns.formatDistanceToNow(new Date(date), {
+            addSuffix: true
+        });
+    } catch {
+        return "recently";
+    }
+}
+
+function escapeHTML(value) {
+    const div = document.createElement("div");
+    div.textContent = value ?? "";
+    return div.innerHTML;
+}
+
+function toast(message) {
+    const element = document.createElement("div");
+    element.className = "toast";
+    element.textContent = message;
+
+    $("#toastContainer").appendChild(element);
+
+    gsap.fromTo(
+        element,
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: .2 }
+    );
+
+    setTimeout(() => {
+        gsap.to(element, {
+            opacity: 0,
+            y: 8,
+            duration: .2,
+            onComplete: () => element.remove()
+        });
+    }, 3000);
+}
