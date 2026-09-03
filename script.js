@@ -5,8 +5,8 @@ const state = {
     selectedFiles: []
 };
 
-const OWNER_USERNAME = "WVOwner";
-const OWNER_PASSWORD = "WVOwnr-MEGAGEGA-6767-BRRBRRPAT-UTAKUSPAKUYTUALETIKI-PISYUNPIPIPOPO-PALABUBIKBLIY";
+const OWNER_USERNAME = "WVDSVOwner";
+const OWNER_PASSWORD = "WVOwnr-MEGAGEGA-6767-BRRBRRPAT-UTAKUSPAKUYTUALETIKI-PISYUNPIPIPOPO-PALABUBIKBLIY-67148852";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
