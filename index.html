@@ -1,357 +1,240 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ClassDrop</title>
-    <meta name="theme-color" content="#0b0b0b">
-
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/date-fns@4.1.0/cdn.min.js"></script>
-
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#090909">
+  <title>ClassVault</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <link rel="stylesheet" href="/style.css">
 </head>
-<body>
+<body x-data="app()" x-init="boot()">
+  <div id="toast" class="toast" :class="{show: toast.visible}">
+    <span class="toast-icon"><i data-lucide="check"></i></span>
+    <span x-text="toast.text"></span>
+  </div>
 
-<div id="loadingScreen" class="screen">
-    <div class="loader-box glass">
-        <div class="brand-mark">C</div>
-        <div class="loader-line">
-            <span></span>
-        </div>
-        <p>Connecting to ClassDrop</p>
-    </div>
-</div>
+  <div class="auth-shell" x-show="!me" x-transition.opacity x-cloak>
+    <div class="auth-orbit orbit-one"></div>
+    <div class="auth-orbit orbit-two"></div>
+    <section class="auth-card glass">
+      <div class="brand-line">
+        <div class="brand-mark"><i data-lucide="layers-3"></i></div>
+        <span>CLASSVAULT</span>
+      </div>
+      <div class="auth-heading">
+        <p class="eyebrow">WELCOME BACK</p>
+        <h1>Everything your class needs.</h1>
+        <p class="muted">A clean space for teachers to share files, updates and resources.</p>
+      </div>
 
-<div id="authScreen" class="screen hidden">
-    <div class="auth-shell">
-        <div class="auth-brand">
-            <div class="brand-mark large">C</div>
-            <div>
-                <h1>ClassDrop</h1>
-                <p>Simple school file sharing.</p>
-            </div>
-        </div>
+      <div class="auth-tabs">
+        <button :class="{active: authMode === 'login'}" @click="authMode='login'">Log in</button>
+        <button :class="{active: authMode === 'signup'}" @click="authMode='signup'">Sign up</button>
+      </div>
 
-        <div class="auth-card glass">
-            <div class="auth-tabs">
-                <button class="auth-tab active" data-auth="login">Log in</button>
-                <button class="auth-tab" data-auth="signup">Sign up</button>
-            </div>
+      <form class="auth-form" @submit.prevent="submitAuth">
+        <label>
+          <span>Username</span>
+          <div class="field-wrap"><i data-lucide="user"></i><input x-model.trim="auth.username" autocomplete="username" maxlength="24" placeholder="Enter your username" required></div>
+        </label>
+        <label>
+          <span>Password</span>
+          <div class="field-wrap"><i data-lucide="lock-keyhole"></i><input x-model="auth.password" type="password" autocomplete="current-password" minlength="8" placeholder="Enter your password" required></div>
+        </label>
+        <button class="primary wide auth-submit" type="submit" :disabled="loading">
+          <i :data-lucide="authMode==='login'?'log-in':'user-plus'"></i>
+          <span x-text="loading ? 'Working…' : authMode === 'login' ? 'Log in' : 'Create account'"></span>
+        </button>
+      </form>
+      <div class="auth-foot"><i data-lucide="shield-check"></i><span>Your account is stored securely by the school server.</span></div>
+    </section>
+  </div>
 
-            <form id="loginForm" class="auth-form">
-                <div>
-                    <label>Username</label>
-                    <input id="loginUsername" type="text" autocomplete="username" required>
-                </div>
-
-                <div>
-                    <label>Password</label>
-                    <input id="loginPassword" type="password" autocomplete="current-password" required>
-                </div>
-
-                <button class="primary-button full" type="submit">
-                    <i data-lucide="log-in"></i>
-                    Log in
-                </button>
-            </form>
-
-            <form id="signupForm" class="auth-form hidden">
-                <div>
-                    <label>Display name</label>
-                    <input id="signupDisplayName" type="text" maxlength="40" required>
-                </div>
-
-                <div>
-                    <label>Username</label>
-                    <input id="signupUsername" type="text" maxlength="24" required>
-                </div>
-
-                <div>
-                    <label>Password</label>
-                    <input id="signupPassword" type="password" minlength="6" required>
-                </div>
-
-                <button class="primary-button full" type="submit">
-                    <i data-lucide="user-plus"></i>
-                    Create account
-                </button>
-            </form>
-
-            <div class="auth-note">
-                <i data-lucide="shield-check"></i>
-                Accounts are synced with the ClassDrop database.
-            </div>
-        </div>
-    </div>
-</div>
-
-<div id="app" class="app hidden">
-
-    <aside id="sidebar" class="sidebar glass">
+  <div class="app-shell" x-show="me" x-cloak>
+    <div class="mobile-overlay" :class="{show: menuOpen}" @click="menuOpen=false"></div>
+    <aside class="sidebar" :class="{open: menuOpen}">
+      <div>
         <div class="sidebar-top">
-            <div class="sidebar-brand">
-                <div class="brand-mark">C</div>
-                <div>
-                    <strong>ClassDrop</strong>
-                    <span>School Hub</span>
-                </div>
-            </div>
-
-            <button id="closeMenu" class="icon-button mobile-only" aria-label="Close menu">
-                <i data-lucide="x"></i>
-            </button>
+          <div class="brand"><span class="brand-symbol"><i data-lucide="layers-3"></i></span><span>ClassVault</span></div>
+          <button class="icon-btn mobile-only" @click="menuOpen=false"><i data-lucide="x"></i></button>
         </div>
-
-        <nav class="nav">
-            <button class="nav-item active" data-section="General">
-                <i data-lucide="layout-grid"></i>
-                <span>General</span>
-            </button>
-
-            <button class="nav-item" data-section="My Class">
-                <i data-lucide="users"></i>
-                <span>My Class</span>
-            </button>
-
-            <button class="nav-item" data-section="Off Topic">
-                <i data-lucide="coffee"></i>
-                <span>Off Topic</span>
-            </button>
+        <div class="sidebar-label">CHANNELS</div>
+        <nav>
+          <button class="nav-item" :class="{active: tab==='General'}" @click="setTab('General')"><span class="nav-icon"><i data-lucide="globe-2"></i></span><span>General</span><span class="nav-dot"></span></button>
+          <button class="nav-item" :class="{active: tab==='My Class'}" @click="setTab('My Class')"><span class="nav-icon"><i data-lucide="school"></i></span><span>My Class</span><span class="nav-dot"></span></button>
+          <button class="nav-item" :class="{active: tab==='Off Topic'}" @click="setTab('Off Topic')"><span class="nav-icon"><i data-lucide="message-circle"></i></span><span>Off Topic</span><span class="nav-dot"></span></button>
         </nav>
+      </div>
 
-        <div class="sidebar-bottom">
-            <div id="ownerLink" class="owner-link hidden">
-                <button class="nav-item" id="openAdmin">
-                    <i data-lucide="shield"></i>
-                    <span>Owner Panel</span>
-                </button>
-            </div>
-
-            <div class="account-mini">
-                <div id="accountAvatar" class="avatar">U</div>
-                <div class="account-details">
-                    <strong id="accountName">User</strong>
-                    <span id="accountRole">Student</span>
-                </div>
-                <button id="logoutButton" class="icon-button" title="Log out">
-                    <i data-lucide="log-out"></i>
-                </button>
-            </div>
-        </div>
+      <div class="sidebar-bottom">
+        <button class="profile-row" @click="profileOpen=true">
+          <div class="avatar" x-text="initials(me?.username)"></div>
+          <div class="profile-copy"><b x-text="me?.username"></b><span x-text="me?.role"></span></div>
+          <i data-lucide="chevron-right"></i>
+        </button>
+        <button class="nav-item logout-item" @click="logout"><span class="nav-icon"><i data-lucide="log-out"></i></span><span>Log out</span></button>
+      </div>
     </aside>
 
-    <main class="main">
+    <main>
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="icon-btn mobile-only" @click="menuOpen=true"><i data-lucide="menu"></i></button>
+          <div class="page-heading"><p class="eyebrow" x-text="tab.toUpperCase()"></p><h2 x-text="tab"></h2></div>
+        </div>
+        <div class="top-actions">
+          <button class="icon-btn" @click="loadData(true)" title="Refresh"><i data-lucide="refresh-cw"></i></button>
+          <button class="profile-mini" @click="profileOpen=true"><span class="avatar" x-text="initials(me?.username)"></span></button>
+        </div>
+      </header>
 
-        <header class="topbar glass">
-            <div class="topbar-left">
-                <button id="openMenu" class="icon-button mobile-only">
-                    <i data-lucide="menu"></i>
-                </button>
+      <section class="content">
+        <div class="welcome-row">
+          <div class="welcome-copy">
+            <div class="section-kicker"><span class="live-dot"></span><span>SHARED RESOURCES</span></div>
+            <h1 x-text="tab === 'My Class' ? 'Class resources' : tab === 'Off Topic' ? 'Off-topic board' : 'Everything in one place'"></h1>
+            <p>Files, updates and useful things for everyone.</p>
+          </div>
+          <button class="primary new-post" x-show="canPost()" @click="composeOpen=true; composer.channel=tab"><i data-lucide="plus"></i><span>New post</span></button>
+        </div>
 
-                <div>
-                    <p class="eyebrow">CLASSDROP</p>
-                    <h2 id="sectionTitle">General</h2>
+        <div class="notice glass" x-show="notifications.length" x-transition>
+          <span class="notice-icon"><i data-lucide="megaphone"></i></span>
+          <div><b>Notice</b><span x-text="notifications[0]?.text"></span></div>
+          <button class="icon-btn" @click="notifications=[]"><i data-lucide="x"></i></button>
+        </div>
+
+        <div class="post-list">
+          <template x-for="post in visiblePosts()" :key="post.id">
+            <article class="post glass" :class="{highlight: post.highlighted}">
+              <div class="post-accent" x-show="post.highlighted"></div>
+              <div class="post-head">
+                <div class="avatar" x-text="initials(post.author)"></div>
+                <div class="post-author">
+                  <div class="author-line"><b x-text="post.author"></b><span class="role-pill" x-text="post.role"></span><span class="muted post-date" x-text="formatDate(post.createdAt)"></span></div>
+                  <span class="muted channel-line"><i data-lucide="hash"></i><span x-text="post.channel"></span></span>
                 </div>
-            </div>
+                <div class="post-flags">
+                  <span x-show="post.pinned" class="flag"><i data-lucide="pin"></i>Pinned</span>
+                  <span x-show="post.highlighted" class="flag"><i data-lucide="sparkles"></i>Highlighted</span>
+                  <div class="relative">
+                    <button class="icon-btn" @click="postMenu=postMenu===post.id?null:post.id"><i data-lucide="more-horizontal"></i></button>
+                    <div class="dropdown glass" x-show="postMenu===post.id" @click.outside="postMenu=null" x-transition>
+                      <button x-show="canModerate()" @click="togglePin(post)"><i data-lucide="pin"></i><span x-text="post.pinned?'Unpin':'Pin'"></span></button>
+                      <button x-show="canModerate()" @click="toggleHighlight(post)"><i data-lucide="sparkles"></i><span x-text="post.highlighted?'Remove highlight':'Highlight'"></span></button>
+                      <button x-show="canModerate()" @click="deletePost(post)"><i data-lucide="trash-2"></i>Delete post</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-            <div class="topbar-actions">
-                <button id="refreshButton" class="icon-button" title="Refresh">
-                    <i data-lucide="refresh-cw"></i>
-                </button>
-
-                <button id="notificationButton" class="icon-button notification-button" title="Notifications">
-                    <i data-lucide="bell"></i>
-                    <span id="notificationDot" class="notification-dot hidden"></span>
-                </button>
-
-                <button id="createPostButton" class="primary-button hidden">
-                    <i data-lucide="plus"></i>
-                    Create post
-                </button>
-            </div>
-        </header>
-
-        <section class="content">
-
-            <div id="welcomeCard" class="welcome-card glass">
-                <div>
-                    <p class="eyebrow">WELCOME BACK</p>
-                    <h1 id="welcomeText">Welcome.</h1>
-                    <p>Everything your class needs, in one place.</p>
+              <div class="post-body">
+                <div class="post-copy">
+                  <h3 x-text="post.title || 'Untitled post'"></h3>
+                  <p class="subtitle" x-show="post.subtitle" x-text="post.subtitle"></p>
+                  <p class="description" x-text="post.description ? (post.description.length>30 ? post.description.slice(0,30)+'…' : post.description) : 'No description.'"></p>
                 </div>
 
-                <div class="welcome-icon">
-                    <i data-lucide="layers-3"></i>
+                <div class="files-grid">
+                  <template x-for="file in post.files" :key="file.id">
+                    <div class="file-card">
+                      <div class="file-icon"><i data-lucide="file"></i></div>
+                      <div class="file-copy"><b x-text="file.name"></b><span x-text="`${prettyBytes(file.size)} · ${file.format}`"></span></div>
+                      <a class="download-btn" :href="file.url" target="_blank" download title="Download"><i data-lucide="download"></i></a>
+                    </div>
+                  </template>
                 </div>
-            </div>
 
-            <div id="feed" class="feed"></div>
+                <div class="post-actions">
+                  <button :class="{liked: liked(post)}" @click="toggleLike(post)"><i data-lucide="heart"></i><span x-text="post.likes?.length || 0"></span><span class="action-label">Like</span></button>
+                  <button @click="openComments(post)"><i data-lucide="message-square"></i><span x-text="post.comments?.length || 0"></span><span class="action-label">Comments</span></button>
+                  <button class="read-action" @click="readPost(post)"><span>Read more</span><i data-lucide="arrow-up-right"></i></button>
+                </div>
+              </div>
+            </article>
+          </template>
 
-            <div id="emptyState" class="empty-state glass hidden">
-                <i data-lucide="inbox"></i>
-                <h3>No posts yet</h3>
-                <p>There isn't anything here yet.</p>
-            </div>
-
-        </section>
+          <div class="empty glass" x-show="visiblePosts().length===0" x-transition>
+            <div class="empty-icon"><i data-lucide="inbox"></i></div>
+            <h3>No posts here yet.</h3>
+            <p>Teachers can publish the first resource.</p>
+            <button class="ghost" x-show="canPost()" @click="composeOpen=true; composer.channel=tab"><i data-lucide="plus"></i>Create the first post</button>
+          </div>
+        </div>
+      </section>
     </main>
-</div>
+  </div>
 
-<div id="composerModal" class="modal hidden">
-    <div class="modal-backdrop"></div>
+  <div class="modal-backdrop" x-show="composeOpen" x-transition.opacity @keydown.escape.window="composeOpen=false">
+    <section class="modal glass compose-modal">
+      <div class="modal-head">
+        <div><p class="eyebrow">NEW POST</p><h2>Share something</h2><p class="modal-subtitle">Add a resource for your class.</p></div>
+        <button class="icon-btn" @click="composeOpen=false"><i data-lucide="x"></i></button>
+      </div>
+      <form @submit.prevent="createPost">
+        <div class="two-col">
+          <label><span>Title <em>optional</em></span><input class="large-input" x-model.trim="composer.title" maxlength="100" placeholder="Give your post a title"></label>
+          <label><span>Subtitle <em>optional</em></span><input class="large-input" x-model.trim="composer.subtitle" maxlength="140" placeholder="A short summary"></label>
+        </div>
+        <label><span>Description <em>optional</em></span><textarea x-model.trim="composer.description" maxlength="1000" rows="5" placeholder="Tell everyone what this resource is about..."></textarea></label>
+        <label><span>Channel</span><div class="select-wrap"><i data-lucide="hash"></i><select x-model="composer.channel"><option>General</option><option>My Class</option><option>Off Topic</option></select></div></label>
 
-    <div class="modal-card glass large-modal">
-        <div class="modal-header">
-            <div>
-                <p class="eyebrow">TEACHER TOOLS</p>
-                <h2>Create post</h2>
-            </div>
-
-            <button class="icon-button close-modal">
-                <i data-lucide="x"></i>
-            </button>
+        <div class="upload-section">
+          <div class="upload-heading"><div><span>Files</span><em>up to 5</em></div><small x-text="composer.files.length + ' / 5 selected'"></small></div>
+          <label class="dropzone" x-show="composer.files.length===0">
+            <div class="upload-icon"><i data-lucide="upload-cloud"></i></div>
+            <strong>Choose files to attach</strong>
+            <span>Any file type · up to 5 files</span>
+            <input type="file" multiple @change="selectFiles" :disabled="composer.files.length>=5">
+          </label>
+          <div class="selected-files" x-show="composer.files.length">
+            <template x-for="(file,index) in composer.files" :key="file.name+index">
+              <div class="selected-file">
+                <div class="selected-file-icon"><i data-lucide="file"></i></div>
+                <div class="selected-file-copy"><b x-text="file.name"></b><span x-text="`${prettyBytes(file.size)} · ${file.type || 'FILE'}`"></span></div>
+                <button type="button" class="remove-file" @click="composer.files.splice(index,1)" title="Remove file"><i data-lucide="x"></i></button>
+              </div>
+            </template>
+            <label class="add-files" x-show="composer.files.length<5"><i data-lucide="plus"></i><span>Add more files</span><input type="file" multiple @change="selectFiles"></label>
+            <div class="file-limit" x-show="composer.files.length>=5"><i data-lucide="check-circle-2"></i><span>Maximum of 5 files selected</span></div>
+          </div>
         </div>
 
-        <form id="postForm">
+        <div class="modal-actions"><button type="button" class="ghost" @click="composeOpen=false">Cancel</button><button class="primary" type="submit" :disabled="loading"><i :data-lucide="loading?'loader-circle':'send'" :class="{spin:loading}"></i><span x-text="loading?'Uploading…':'Publish post'"></span></button></div>
+      </form>
+    </section>
+  </div>
 
-            <div class="field">
-                <label>Title <span>optional</span></label>
-                <input id="postTitle" type="text" maxlength="100" placeholder="Homework, announcement...">
-            </div>
+  <div class="modal-backdrop" x-show="commentsOpen" x-transition.opacity>
+    <section class="modal glass comments-modal">
+      <div class="modal-head"><div><p class="eyebrow">COMMENTS</p><h2 x-text="activePost?.title || 'Post'"></h2></div><button class="icon-btn" @click="commentsOpen=false"><i data-lucide="x"></i></button></div>
+      <div class="comments">
+        <template x-for="comment in activePost?.comments || []" :key="comment.id"><div class="comment"><div class="avatar small" x-text="initials(comment.author)"></div><div><b x-text="comment.author"></b><p x-text="comment.text"></p></div></div></template>
+        <div class="comment-empty" x-show="!(activePost?.comments?.length)"><i data-lucide="message-square"></i><span>No comments yet.</span></div>
+      </div>
+      <form class="comment-form" @submit.prevent="addComment"><input class="large-input" x-model.trim="commentText" maxlength="500" placeholder="Write a comment…" required><button class="primary" type="submit"><i data-lucide="send"></i></button></form>
+    </section>
+  </div>
 
-            <div class="field">
-                <label>Subtitle <span>optional</span></label>
-                <input id="postSubtitle" type="text" maxlength="100" placeholder="A short description">
-            </div>
-
-            <div class="field">
-                <label>Description <span>optional</span></label>
-                <textarea id="postDescription" maxlength="1000" placeholder="Tell everyone what this post is about..."></textarea>
-            </div>
-
-            <div class="field">
-                <label>Section</label>
-                <select id="postSection">
-                    <option>General</option>
-                    <option>My Class</option>
-                    <option>Off Topic</option>
-                </select>
-            </div>
-
-            <div class="field">
-                <label>Files <span>up to 5</span></label>
-
-                <label class="drop-zone">
-                    <input id="postFiles" type="file" multiple>
-                    <i data-lucide="upload-cloud"></i>
-                    <strong>Choose files</strong>
-                    <span>Any file type • maximum 5 files</span>
-                </label>
-
-                <div id="selectedFiles" class="selected-files"></div>
-            </div>
-
-            <div class="teacher-options">
-                <label class="switch-row">
-                    <span>
-                        <strong>Pin post</strong>
-                        <small>Keep it at the top.</small>
-                    </span>
-                    <input id="postPinned" type="checkbox">
-                </label>
-
-                <label class="switch-row">
-                    <span>
-                        <strong>Highlight</strong>
-                        <small>Give the post extra attention.</small>
-                    </span>
-                    <input id="postHighlighted" type="checkbox">
-                </label>
-
-                <label class="switch-row">
-                    <span>
-                        <strong>Notify everyone</strong>
-                        <small>Send a notification to all users.</small>
-                    </span>
-                    <input id="postNotify" type="checkbox">
-                </label>
-            </div>
-
-            <div class="modal-actions">
-                <button type="button" class="secondary-button close-modal">Cancel</button>
-                <button type="submit" class="primary-button">
-                    <i data-lucide="send"></i>
-                    Publish
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<div id="postModal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-
-    <div class="modal-card glass large-modal">
-        <div id="postModalContent"></div>
-    </div>
-</div>
-
-<div id="adminModal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-
-    <div class="modal-card glass admin-modal">
-        <div class="modal-header">
-            <div>
-                <p class="eyebrow">OWNER ONLY</p>
-                <h2>Owner Panel</h2>
-            </div>
-
-            <button class="icon-button close-modal">
-                <i data-lucide="x"></i>
-            </button>
+  <div class="modal-backdrop" x-show="profileOpen" x-transition.opacity>
+    <section class="modal glass profile-modal">
+      <div class="modal-head"><div><p class="eyebrow">ACCOUNT</p><h2 x-text="me?.username"></h2></div><button class="icon-btn" @click="profileOpen=false"><i data-lucide="x"></i></button></div>
+      <div class="account-card"><div class="avatar big" x-text="initials(me?.username)"></div><div><h3 x-text="me?.username"></h3><span class="role-pill" x-text="me?.role"></span></div></div>
+      <template x-if="me?.role==='owner'">
+        <div class="admin">
+          <div class="section-title"><span>Owner controls</span><span class="muted" x-text="users.length+' accounts'"></span></div>
+          <div class="admin-list">
+            <template x-for="user in users" :key="user.id"><div class="admin-user"><div class="admin-user-main"><div class="avatar small" x-text="initials(user.username)"></div><div><b x-text="user.username"></b><span class="muted" x-text="user.role"></span></div></div><div class="admin-actions"><button @click="setRole(user, user.role==='teacher'?'student':'teacher')" :disabled="user.username==='WVOwner'"><i data-lucide="graduation-cap"></i><span x-text="user.role==='teacher'?'Student':'Teacher'"></span></button><button @click="setMute(user)" :disabled="user.username==='WVOwner'"><i data-lucide="volume-x"></i><span x-text="user.muted?'Unmute':'Mute'"></span></button><button @click="setBan(user)" :disabled="user.username==='WVOwner'"><i data-lucide="ban"></i><span x-text="user.banned?'Unban':'Ban'"></span></button></div></div></template>
+          </div>
         </div>
+      </template>
+    </section>
+  </div>
 
-        <div class="admin-stats">
-            <div class="stat-card">
-                <span>Accounts</span>
-                <strong id="accountCount">0</strong>
-            </div>
-
-            <div class="stat-card">
-                <span>Posts</span>
-                <strong id="postCount">0</strong>
-            </div>
-
-            <div class="stat-card">
-                <span>Teachers</span>
-                <strong id="teacherCount">0</strong>
-            </div>
-        </div>
-
-        <div id="accountsList" class="accounts-list"></div>
-    </div>
-</div>
-
-<div id="notificationsPanel" class="notifications-panel glass hidden">
-    <div class="panel-header">
-        <div>
-            <p class="eyebrow">ACTIVITY</p>
-            <h3>Notifications</h3>
-        </div>
-
-        <button id="clearNotifications" class="text-button">Clear</button>
-    </div>
-
-    <div id="notificationsList"></div>
-</div>
-
-<div id="toastContainer"></div>
-
-<script src="servers.js"></script>
-<script src="script.js"></script>
+  <script src="/script.js"></script>
 </body>
 </html>
